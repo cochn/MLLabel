@@ -21,6 +21,8 @@
 @property (nonatomic, copy) NSString *regex;
 @property (nonatomic, copy) NSString *plistName;
 @property (nonatomic, copy) NSString *bundleName;
+@property (nonatomic, copy) NSString *bundleClass;
+
 
 @property (nonatomic, strong) NSRegularExpression *expressionRegularExpression;
 @property (nonatomic, strong) NSDictionary *expressionMap;
@@ -65,7 +67,17 @@
 }
 
 #pragma mark - common
-- (NSDictionary*)expressionMapWithPlistName:(NSString*)plistName
+- (NSBundle *)ml_bunlde{
+    NSURL *bundleUrl = [[NSBundle bundleForClass:[self class]] URLForResource:@"Resource" withExtension:@"bundle"];
+    if (bundleUrl == nil) {
+        return [NSBundle bundleForClass:[self class]];
+    }
+    
+    NSBundle *bundle = [NSBundle bundleWithURL:bundleUrl];
+    return bundle;
+}
+
+- (NSDictionary*)expressionMapWithPlistName:(NSString*)plistName bundle:(NSString *)bundleClass
 {
     NSAssert(plistName&&plistName.length>0, @"expressionMapWithRegex:参数不得为空");
     
@@ -73,8 +85,9 @@
         return self.expressionMapRecords[plistName];
     }
     
-    NSString *plistPath = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:plistName];
-    NSDictionary *dict = [[NSDictionary alloc] initWithContentsOfFile:plistPath];
+    NSBundle *bundle = [self ml_bunlde];
+    NSURL *plistPath = [bundle URLForResource:plistName withExtension:nil];
+    NSDictionary *dict = [[NSDictionary alloc] initWithContentsOfURL:plistPath];
     NSAssert(dict,@"表情字典%@找不到,请注意大小写",plistName);
     self.expressionMapRecords[plistName] = dict;
     
@@ -192,7 +205,7 @@
             //加个表情到结果中
             UIImage *image = nil;
             if ([UIImage respondsToSelector:@selector(imageNamed:inBundle:compatibleWithTraitCollection:)]) {
-                NSBundle *bundle = [NSBundle bundleWithURL:[[NSBundle mainBundle] URLForResource:expression.bundleName withExtension:nil]];
+                NSBundle *bundle = [NSBundle bundleWithURL:[[NSBundle bundleForClass:[MLExpression class]] URLForResource:expression.bundleName withExtension:nil]];
                 image = [UIImage imageNamed:imageName inBundle:bundle compatibleWithTraitCollection:nil];
             }else{
                 NSString *imagePath = [expression.bundleName stringByAppendingPathComponent:imageName];
@@ -235,13 +248,14 @@
 
 - (BOOL)isValid
 {
-    return self.expressionRegularExpression&&self.expressionMap&&self.bundleName.length>0;
+    return self.expressionRegularExpression&&self.expressionMap&&self.bundleName.length>0 ;
 }
 
-+ (instancetype)expressionWithRegex:(NSString*)regex plistName:(NSString*)plistName bundleName:(NSString*)bundleName
++ (instancetype)expressionWithRegex:(NSString*)regex plistName:(NSString*)plistName bundleName:(NSString*)bundleName bundle:(NSString *)bundleClass
 {
     MLExpression *expression = [MLExpression new];
     expression.regex = regex;
+    expression.bundleClass = bundleClass;
     expression.plistName = plistName;
     expression.bundleName = bundleName;
     NSAssert([expression isValid], @"此expression无效，请检查参数");
@@ -267,7 +281,7 @@
         _plistName = [_plistName stringByAppendingString:@".plist"];
     }
     
-    self.expressionMap = [[MLExpressionManager sharedInstance]expressionMapWithPlistName:_plistName];
+    self.expressionMap = [[MLExpressionManager sharedInstance]expressionMapWithPlistName:_plistName bundle:self.bundleClass];
 }
 
 - (void)setBundleName:(NSString *)bundleName
